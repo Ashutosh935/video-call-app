@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Example</title>
+</head>
+<body>
+    <h1>WebRTC Example</h1>
+    <video id="localVideo" autoplay></video>
+    <video id="remoteVideo" autoplay></video>
+    <button id="startButton">Start Call</button>
+    <button id="hangupButton">Hang Up</button>
+
+    <script src="https://cdn.jsdelivr.net/npm/simple-peer@10.1.1/dist/simplepeer.min.js"></script>
+    <script>
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const startButton = document.getElementById('startButton');
+        const hangupButton = document.getElementById('hangupButton');
+        let peer;
+
+        startButton.addEventListener('click', async () => {
+            // Get user media (camera and microphone)
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            localVideo.srcObject = stream;
+
+            // Create a peer connection
+            peer = new SimplePeer({
+                initiator: true,
+                stream: stream
+            });
+
+            // Handle signaling events
+            peer.on('signal', (data) => {
+                // Send the offer to the server
+                socket.emit('offer', data);
+            });
+
+            peer.on('stream', (stream) => {
+                // Display the remote video stream
+                remoteVideo.srcObject = stream;
+            });
+        });
+
+        hangupButton.addEventListener('click', () => {
+            // Close the peer connection
+            if (peer) {
+                peer.destroy();
+            }
+            localVideo.srcObject.getTracks().forEach((track) => track.stop());
+            localVideo.srcObject = null;
+            remoteVideo.srcObject = null;
+        });
+
+        const socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        socket.on('connect', () => {
+            console.log('Connected to signaling server');
+        });
+
+        socket.on('offer', (data) => {
+            // Handle incoming offers
+            peer.signal(data);
+        });
+
+        socket.on('answer', (data) => {
+            // Handle incoming answers
+            peer.signal(data);
+        });
+    </script>
+</body>
+</html>
